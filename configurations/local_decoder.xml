@@ -1,0 +1,13 @@
+<!-- Custom Wazuh Decoder -->
+<!-- EdgeRouter X Firewall Log Format -->
+<!-- Location: /var/ossec/etc/decoders/local_decoder.xml -->
+<!--                                                        -->
+<!-- EdgeRouter kernel firewall logs use the format:        -->
+<!-- kernel: [WAN_IN-20-A]IN=eth0 OUT=eth2.30 SRC=x.x.x.x  -->
+<!-- This decoder extracts the key fields for alerting.     -->
+
+<decoder name="edgerouter-firewall">
+  <prematch>kernel: .WAN_</prematch>
+  <regex>kernel: .(\w+)-(\d+)-(\w).IN=(\w+) OUT=(\S+) \S+ SRC=(\S+) DST=(\S+) \S+ \S+ \S+ \S+ PROTO=(\w+)</regex>
+  <order>firewall_rule,rule_number,action,in_interface,out_interface,srcip,dstip,protocol</order>
+</decoder>

@@ -1,0 +1,6 @@
+# Never commit credentials
+.env
+
+# Sanitize before committing
+*.pcap
+*.log
