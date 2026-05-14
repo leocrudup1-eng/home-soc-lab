@@ -1,39 +1,146 @@
 <!-- Custom Wazuh Detection Rules -->
-<!-- EdgeRouter X / Ubiquiti Events -->
 <!-- Location: /var/ossec/etc/rules/local_rules.xml -->
+<!-- Last updated: 2026-05-14 -->
 
-<group name="ubiquiti,edgerouter,">
+<!-- ============================================================ -->
+<!-- SURICATA SUPPRESSION RULES                                   -->
+<!-- Suppress known false positives from SPAN port capture        -->
+<!-- ============================================================ -->
+<group name="suricata,">
 
-  <!-- EdgeRouter firewall block event -->
-  <rule id="100001" level="5">
-    <program_name>kernel</program_name>
-    <match>UBNT_FW</match>
-    <description>EdgeRouter firewall event</description>
-    <group>firewall,</group>
+  <!-- Suppress TCP stream invalid ack — expected on SPAN port -->
+  <rule id="110001" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA STREAM PACKET with invalid ack</match>
+    <description>Suppress Suricata stream invalid ack false positive</description>
   </rule>
 
-  <!-- SSH brute force / failed login -->
-  <rule id="100002" level="10">
-    <program_name>sshd</program_name>
-    <match>Failed password</match>
-    <description>EdgeRouter SSH failed login attempt</description>
-    <group>authentication_failed,</group>
+  <!-- Suppress TCP stream shutdown RST — expected on SPAN port -->
+  <rule id="110002" level="0">
+    <if_group>suricata</if_group>
+    <match>SURICATA STREAM SHUTDOWN RST invalid</match>
+    <description>Suppress Suricata stream shutdown RST false positive</description>
   </rule>
 
-  <!-- New DHCP lease (new device on network) -->
-  <rule id="100003" level="5">
-    <program_name>dhcpd</program_name>
-    <match>DHCPACK</match>
-    <description>EdgeRouter new DHCP lease assigned</description>
-    <group>dhcp,</group>
+  <!-- Suppress Suricata stats events -->
+  <rule id="110003" level="0">
+    <if_sid>100002</if_sid>
+    <description>Suppress Suricata stats events</description>
   </rule>
 
-  <!-- Successful SSH login to router -->
-  <rule id="100004" level="12">
-    <program_name>sshd</program_name>
-    <match>Accepted password|Accepted publickey</match>
-    <description>EdgeRouter successful SSH login</description>
-    <group>authentication_success,</group>
+  <!-- Suppress Suricata anomaly noise -->
+  <rule id="110004" level="0">
+    <if_group>suricata</if_group>
+    <match>Suricata Traffic - anomaly</match>
+    <description>Suppress Suricata anomaly noise</description>
+  </rule>
+
+  <!-- Suppress Suricata flow events -->
+  <rule id="110005" level="0">
+    <if_group>suricata</if_group>
+    <match>Suricata Traffic - flow</match>
+    <description>Suppress Suricata flow events</description>
+  </rule>
+
+  <!-- Suppress Suricata QUIC events -->
+  <rule id="110006" level="0">
+    <if_group>suricata</if_group>
+    <match>Suricata Traffic - quic</match>
+    <description>Suppress Suricata QUIC events</description>
+  </rule>
+
+  <!-- Suppress TLS alerts for internal subnet traffic -->
+  <rule id="110010" level="0">
+    <if_sid>100008</if_sid>
+    <match>192.168.3.</match>
+    <description>Suppress Suricata TLS for internal traffic</description>
+  </rule>
+
+  <!-- Suppress Ugreen CM933 switch traffic — blocked at router -->
+  <rule id="110011" level="0">
+    <if_group>suricata</if_group>
+    <field name="data.src_ip">192.168.3.11</field>
+    <description>Suppress UGreen switch traffic - blocked at router</description>
+  </rule>
+
+</group>
+
+<!-- ============================================================ -->
+<!-- AUDITD SUPPRESSION RULES                                     -->
+<!-- ============================================================ -->
+<group name="audit,">
+
+  <!-- Suppress Suricata enabling promiscuous mode — expected behavior -->
+  <rule id="110007" level="0">
+    <if_group>audit</if_group>
+    <match>Device enables promiscuous mode</match>
+    <field name="data.audit.exe">/usr/bin/suricata</field>
+    <description>Suppress Suricata promiscuous mode - expected behavior</description>
+  </rule>
+
+</group>
+
+<!-- ============================================================ -->
+<!-- SYSMON SUPPRESSION RULES                                     -->
+<!-- ============================================================ -->
+<group name="sysmon,">
+
+  <!-- Suppress CompatTelRunner spawning PowerShell — Windows telemetry -->
+  <rule id="110008" level="0">
+    <if_group>sysmon</if_group>
+    <field name="data.win.eventdata.parentImage" type="pcre2">(?i)CompatTelRunner\.exe</field>
+    <description>Suppress CompatTelRunner spawning PowerShell - known benign telemetry</description>
+  </rule>
+
+</group>
+
+<!-- ============================================================ -->
+<!-- VULNERABILITY DETECTOR SUPPRESSION                           -->
+<!-- ============================================================ -->
+<group name="vulnerability-detector,">
+
+  <!-- Suppress Thunderbird CVEs — package removed from system -->
+  <rule id="110009" level="0">
+    <if_sid>23506</if_sid>
+    <description>Suppress Thunderbird CVEs - package removed</description>
+  </rule>
+
+</group>
+
+<!-- ============================================================ -->
+<!-- PI-HOLE DNS RULES                                            -->
+<!-- Visibility into DNS queries and blocked domains             -->
+<!-- ============================================================ -->
+<group name="pihole,dns,">
+
+  <!-- Log all Pi-hole DNS queries — level 3 informational -->
+  <rule id="600001" level="3">
+    <decoded_as>pihole-query</decoded_as>
+    <description>Pi-hole DNS query from $(srcip)</description>
+  </rule>
+
+  <!-- Alert on Pi-hole blocked domains — possible malicious activity -->
+  <rule id="600002" level="10">
+    <decoded_as>pihole-query</decoded_as>
+    <match>gravity blocked</match>
+    <description>Pi-hole blocked a DNS query - possible malicious domain</description>
+  </rule>
+
+</group>
+
+<!-- ============================================================ -->
+<!-- WINDOWS AUTHENTICATION RULES                                 -->
+<!-- ============================================================ -->
+<group name="windows,authentication,">
+
+  <!-- Windows failed logon — Event ID 529/4625 -->
+  <rule id="101556" level="12">
+    <if_sid>60105</if_sid>
+    <field name="win.system.eventID">^529$|^4625$</field>
+    <description>Logon Failure - Unknown user or bad password</description>
+    <mitre>
+      <id>T1531</id>
+    </mitre>
   </rule>
 
 </group>
